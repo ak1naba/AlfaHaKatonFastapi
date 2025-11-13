@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyi
+*.env
+*.venv
+*.egg-info/
+*.egg
+*.pytest_cache/
+*.mypy_cache/
+*.coverage
+*.tox/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+out/
+.idea_modules/
+
+# VS Code (если вдруг используешь)
+.vscode/
+
+# Docker
+*.log
+*.pid
+docker-compose.override.yml
+
+# Docker volumes / temporary files
+postgres_data/
+redis_data/
+
+# MacOS
+.DS_Store
+
+# Pytest / coverage reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Misc
+*.swp
+*.swo
