@@ -10,3 +10,15 @@ python-dotenv
 alembic
 email-validator
 requests
+
+# Google Calendar API
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+# MCP (Model Context Protocol)
+mcp
+httpx
+
+

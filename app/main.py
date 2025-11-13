@@ -2,18 +2,20 @@ from fastapi import FastAPI
 from app.core.database import engine, Base
 from app.models import chat  # импортируем модели
 from app.api.chats import router as chats_router
+from app.api.calendar import router as calendar_router
 
 # Создаем таблицы
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="OpenRouter Microservice",
-    description="Микросервис для работы с OpenRouter API",
+    description="Микросервис для работы с OpenRouter API и Google Calendar через MCP",
     version="1.0.0"
 )
 
 # Подключаем роутеры
 app.include_router(chats_router)
+app.include_router(calendar_router)
 
 @app.get("/")
 async def root():

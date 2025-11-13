@@ -43,3 +43,7 @@ htmlcov/
 # Misc
 *.swp
 *.swo
+
+# Google Calendar API credentials
+credentials.json
+token.json
