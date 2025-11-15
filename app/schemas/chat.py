@@ -6,6 +6,7 @@ from typing import Optional, List
 class ChatMessageBase(BaseModel):
     role: str  # user, assistant, system
     content: str
+    message_type: str = "text"  # text, mcp, file, long_text
 
 class ChatMessageCreate(ChatMessageBase):
     pass
@@ -43,11 +44,12 @@ class ChatResponse(ChatBase):
 class SendMessageRequest(BaseModel):
     content: str
     chat_id: Optional[int] = None  # Если None, создается новый чат
-    model: Optional[str] = "nvidia/nemotron-nano-12b-v2-vl:free"
+    model: Optional[str] = "meituan/longcat-flash-chat:free"
     system_prompt: Optional[str] = None
 
 class SendMessageResponse(BaseModel):
     chat_id: int
     user_message: ChatMessageResponse
-    assistant_message: ChatMessageResponse
+    assistant_message: Optional[ChatMessageResponse] = None
+    assistant_messages: List[ChatMessageResponse] = []  # Все распарсенные сообщения
 

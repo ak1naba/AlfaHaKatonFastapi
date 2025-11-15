@@ -8,7 +8,7 @@ from app.schemas.chat import (
     SendMessageRequest, SendMessageResponse,
     ChatMessageResponse
 )
-from app.services.chat_service import send_chat_message
+from app.services.chat_service import send_chat_message, parse_assistant_response, load_system_prompt
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -109,19 +109,43 @@ async def send_message(
     """
     Отправка сообщения в чат.
     Если chat_id не указан, создается новый чат.
+    
+    Парсит ответ AI по тегам и создает несколько сообщений в БД:
+    - <text>...</text> → message_type='text'
+    - <mcp>...</mcp> → message_type='mcp'
+    - <file>...</file> → message_type='file'
+    - <long_text>...</long_text> → message_type='long_text'
     """
     try:
         # Если chat_id не указан, создаем новый чат
         if request.chat_id is None:
+            # Создаём чат и записываем системный промпт из запроса или из файла promt.md
+            system_text = request.system_prompt
+            if not system_text:
+                # load_system_prompt вернёт '' если файл не найден
+                system_text = load_system_prompt()
+
             chat = Chat(
                 external_id=external_id,
                 title=request.content[:50] + "..." if len(request.content) > 50 else request.content,
                 model=request.model,
-                system_prompt=request.system_prompt
+                system_prompt=system_text
             )
             db.add(chat)
             db.commit()
             db.refresh(chat)
+
+            # Если есть системный промпт — сохраняем его как системное сообщение в БД
+            if system_text:
+                sys_msg = ChatMessage(
+                    chat_id=chat.id,
+                    role="system",
+                    content=system_text,
+                    message_type="text"
+                )
+                db.add(sys_msg)
+                db.commit()
+                db.refresh(sys_msg)
         else:
             # Проверяем существует ли чат и принадлежит ли он пользователю
             chat = db.query(Chat).filter(
@@ -135,41 +159,63 @@ async def send_message(
         user_message = ChatMessage(
             chat_id=chat.id,
             role="user",
-            content=request.content
+            content=request.content,
+            message_type="text"
         )
         db.add(user_message)
         db.commit()
         db.refresh(user_message)
 
-        # Получаем историю сообщений для контекста
+        # Получаем историю сообщений для контекста (только основной контент, не типированные)
         messages_history = db.query(ChatMessage).filter(
             ChatMessage.chat_id == chat.id
         ).order_by(ChatMessage.created_at).all()
 
-        # Формируем историю для OpenRouter
+        # Формируем историю для OpenRouter (берем содержимое, игнорируя типы)
         history = [{"role": msg.role, "content": msg.content} for msg in messages_history]
 
         # Отправляем запрос в OpenRouter
-        assistant_content = await send_chat_message(
+        assistant_response = await send_chat_message(
             messages=history,
             model=chat.model,
             system_prompt=chat.system_prompt
         )
 
-        # Сохраняем ответ ассистента
-        assistant_message = ChatMessage(
-            chat_id=chat.id,
-            role="assistant",
-            content=assistant_content
-        )
-        db.add(assistant_message)
-        db.commit()
-        db.refresh(assistant_message)
+        # Парсим ответ по тегам
+        parsed_messages = parse_assistant_response(assistant_response)
+
+        # Сохраняем каждое распарсенное сообщение
+        saved_messages = []
+        for parsed_msg in parsed_messages:
+            assistant_message = ChatMessage(
+                chat_id=chat.id,
+                role="assistant",
+                content=parsed_msg.content,
+                message_type=parsed_msg.message_type
+            )
+            db.add(assistant_message)
+            db.commit()
+            db.refresh(assistant_message)
+            saved_messages.append(ChatMessageResponse.model_validate(assistant_message))
+
+        # Если нет распарсенных сообщений, сохраняем весь ответ как текст
+        if not saved_messages:
+            assistant_message = ChatMessage(
+                chat_id=chat.id,
+                role="assistant",
+                content=assistant_response,
+                message_type="text"
+            )
+            db.add(assistant_message)
+            db.commit()
+            db.refresh(assistant_message)
+            saved_messages.append(ChatMessageResponse.model_validate(assistant_message))
 
         return SendMessageResponse(
             chat_id=chat.id,
             user_message=ChatMessageResponse.model_validate(user_message),
-            assistant_message=ChatMessageResponse.model_validate(assistant_message)
+            assistant_message=saved_messages[0] if saved_messages else None,
+            assistant_messages=saved_messages 
         )
 
     except HTTPException:

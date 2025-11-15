@@ -26,6 +26,7 @@ class ChatMessage(Base):
     chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False, index=True)
     role = Column(String(50), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
+    message_type = Column(String(50), nullable=False, default="text")  # text, mcp, file, long_text
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Связь
