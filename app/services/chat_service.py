@@ -1,4 +1,5 @@
 import os
+import httpx
 from typing import List, Dict, Any
 from openai import OpenAI
 from app.core.config import settings
@@ -83,4 +84,48 @@ def parse_assistant_response(response: str) -> List[ParsedMessage]:
         Список ParsedMessage объектов
     """
     return parse_ai_response(response)
+
+
+async def execute_mcp_message(message_content: str) -> Dict[str, Any]:
+    """
+    Выполняет MCP сообщение, отправляя его JSON содержимое на эндпоинт
+    
+    Args:
+        message_content: JSON содержимое MCP сообщения
+        
+    Returns:
+        Ответ от MCP сервера
+        
+    Raises:
+        Exception: В случае ошибки выполнения запроса
+    """
+    try:
+        import json
+        
+        # Парсим JSON содержимое
+        try:
+            json_data = json.loads(message_content)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON content in MCP message")
+        
+        # Отправляем запрос на MCP эндпоинт
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://test.glyx.ru/mcp/execute",
+                json=json_data,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            # Проверяем статус ответа
+            response.raise_for_status()
+            
+            # Возвращаем результат
+            return response.json()
+            
+    except httpx.HTTPStatusError as e:
+        raise Exception(f"MCP execution failed with status {e.response.status_code}: {e.response.text}")
+    except httpx.RequestError as e:
+        raise Exception(f"MCP request failed: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Error executing MCP message: {str(e)}")
 

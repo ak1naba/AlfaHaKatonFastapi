@@ -8,7 +8,7 @@ from app.schemas.chat import (
     SendMessageRequest, SendMessageResponse,
     ChatMessageResponse
 )
-from app.services.chat_service import send_chat_message, parse_assistant_response, load_system_prompt
+from app.services.chat_service import send_chat_message, parse_assistant_response, load_system_prompt, execute_mcp_message
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -222,4 +222,50 @@ async def send_message(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+
+
+@router.post("/messages/{message_id}/execute")
+async def execute_mcp_message_by_id(
+    message_id: int,
+    db: Session = Depends(get_db),
+    external_id: str = Depends(get_external_id)
+):
+    """
+    Выполняет MCP сообщение по его ID.
+    Сообщение должно иметь тип 'mcp' и принадлежать чату пользователя.
+    """
+    try:
+        # Получаем сообщение из БД
+        message = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+        if not message:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Проверяем что сообщение принадлежит чату пользователя
+        chat = db.query(Chat).filter(
+            Chat.id == message.chat_id,
+            Chat.external_id == external_id
+        ).first()
+        if not chat:
+            raise HTTPException(status_code=403, detail="Access denied to this message")
+        
+        # Проверяем что сообщение имеет тип 'mcp'
+        if message.message_type != "mcp":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Message type must be 'mcp', got '{message.message_type}'"
+            )
+        
+        # Выполняем MCP запрос
+        result = await execute_mcp_message(message.content)
+        
+        return {
+            "message_id": message_id,
+            "status": "success",
+            "result": result
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing MCP message: {str(e)}")
 
