@@ -21,7 +21,7 @@ class ChatMessageResponse(ChatMessageBase):
 # === Chat Schemas ===
 class ChatBase(BaseModel):
     title: Optional[str] = None
-    model: str = "nvidia/nemotron-nano-12b-v2-vl:free"
+    model: str = "meituan/longcat-flash-chat:free"
     system_prompt: Optional[str] = None
 
 class ChatCreate(ChatBase):

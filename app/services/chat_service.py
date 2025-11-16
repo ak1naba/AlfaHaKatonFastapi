@@ -16,16 +16,16 @@ def load_system_prompt() -> str:
     Returns:
         Содержимое промпта или пустая строка если файл не найден
     """
-    prompt_path = os.path.join(os.path.dirname(__file__), '..', '..', 'prompt.md')
+    prompt_path = os.path.join(os.path.dirname(__file__), 'prompt.md')
     
     if os.path.exists(prompt_path):
         try:
             with open(prompt_path, 'r', encoding='utf-8') as f:
+                print(f.read())
                 return f.read()
         except Exception as e:
             print(f"Warning: Failed to load system prompt from {prompt_path}: {e}")
             return ""
-    
     return ""
 
 
